@@ -24,6 +24,9 @@ public class ASTListener extends ICSSBaseListener {
 	//Use this to keep track of the parent nodes when recursively traversing the ast
 	private IHANStack<ASTNode> currentContainer;
 
+	// Might need pre-order traversal if copying, not sure how this will translate onto the stack, still need to research to convert Parse Tree to AST.
+	// Assume with no error nodes in the Parse Tree that it's safe to convert to an AST (So no extra checking required)
+	// ! W6L1 ! Important
 	public ASTListener() {
 		ast = new AST();
 		//currentContainer = new HANStack<>();

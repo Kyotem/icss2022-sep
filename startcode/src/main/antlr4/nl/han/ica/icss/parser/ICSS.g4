@@ -6,7 +6,6 @@ grammar ICSS;
 IF: 'if';
 ELSE: 'else';
 
-
 COLOR_PROPERTY : 'color' | 'background-color';
 DIM_PROPERTY : 'width' | 'height' ;
 
@@ -16,16 +15,16 @@ PIXELSIZE: [0-9]+ 'px';
 PERCENTAGE: [0-9]+ '%';
 SCALAR: [0-9]+;
 
-//Color value takes precedence over id idents
+// Color value takes precedence over id idents
 fragment HEXDIGIT : [0-9a-fA-F] ;
 HEXVAL : '#' HEXDIGIT HEXDIGIT HEXDIGIT HEXDIGIT HEXDIGIT HEXDIGIT ;
 
-//Specific identifiers for id's and css classes
+// Specific identifiers for id's and css classes
 // Why are these separated? Is there a reason to tokenize these separately? (Syntaxically it shouldn't matter, Only semantically, so why not [a-z0-9#.\-)
 ID_IDENT: '#' [a-z0-9\-]+;
 CLASS_IDENT: '.' [a-z0-9\-]+;
 
-//General identifiers
+// General identifiers
 // Can this be improved or are we just stuck like this?
 // Currently using for : selectors
 LOWER_IDENT: [a-z] [a-z0-9\-]*;
