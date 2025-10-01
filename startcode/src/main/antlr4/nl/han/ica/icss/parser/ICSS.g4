@@ -15,6 +15,7 @@ PIXELSIZE: [0-9]+ 'px';
 PERCENTAGE: [0-9]+ '%';
 SCALAR: [0-9]+;
 
+
 // Color value takes precedence over id idents
 fragment HEXDIGIT : [0-9a-fA-F] ;
 HEXVAL : '#' HEXDIGIT HEXDIGIT HEXDIGIT HEXDIGIT HEXDIGIT HEXDIGIT ;
@@ -58,15 +59,14 @@ statement
     | selectorstmt
     ;
 
-
 mathExpr
     : additionExpr
-    | multiplicationExpr
     ;
+
 
 // Allows for multiplication at the start, or just directly a plus or minus, and multiplication at the end. (Repeating it so you can build it as long as you want)
 additionExpr
-    : multiplicationExpr ((PLUS | MIN) multiplicationExpr)+
+    : multiplicationExpr ((PLUS | MIN) multiplicationExpr)*
     ;
 
 // Define the starting operand to work with, and add the MUL operator if it's there.
@@ -77,15 +77,8 @@ multiplicationExpr
 
 // Base units or variables
 mathOperand
-    : mathValue
-    | CAPITAL_IDENT  // variables
-    ;
-
-// Only values allowed for mathmathical evaluations (Can this be condensed? feels like im duplicating code)
-mathValue
-    : SCALAR
-    | PERCENTAGE
-    | PIXELSIZE
+    : numberLiteral
+    | CAPITAL_IDENT
     ;
 
 // Top-level math expression (entrypoint)
@@ -103,11 +96,16 @@ colorValue
     ;
 
 dimensionValue
-    : PIXELSIZE
-    | SCALAR
-    | PERCENTAGE
+    : numberLiteral
     | CAPITAL_IDENT
     | mathExpr
+    ;
+
+// Only values allowed for mathmathical evaluations (Can this be condensed? feels like im duplicating code)
+numberLiteral
+    : SCALAR
+    | PERCENTAGE
+    | PIXELSIZE
     ;
 
 // Selector (CSS) block
