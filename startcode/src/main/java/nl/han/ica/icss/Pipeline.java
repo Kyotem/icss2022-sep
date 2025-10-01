@@ -49,7 +49,7 @@ public class Pipeline implements ANTLRErrorListener {
 
     public void parseString(String input) {
 
-        //Lex (with Antlr's generated lexer)
+        // Lex (with Antlr's generated lexer)
         CharStream inputStream = CharStreams.fromString(input);
         ICSSLexer lexer = new ICSSLexer(inputStream);
         lexer.removeErrorListeners();

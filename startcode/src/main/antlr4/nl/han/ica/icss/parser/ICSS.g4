@@ -21,17 +21,18 @@ HEXVAL : '#' HEXDIGIT HEXDIGIT HEXDIGIT HEXDIGIT HEXDIGIT HEXDIGIT ;
 
 // Specific identifiers for id's and css classes
 // Why are these separated? Is there a reason to tokenize these separately? (Syntaxically it shouldn't matter, Only semantically, so why not [a-z0-9#.\-)
-ID_IDENT: '#' [a-z0-9\-]+;
-CLASS_IDENT: '.' [a-z0-9\-]+;
+//ID_IDENT: '#' [a-z0-9\-]+;
+//CLASS_IDENT: '.' [a-z0-9\-]+;
 
 // General identifiers
 // Can this be improved or are we just stuck like this?
 // Currently using for : selectors
-LOWER_IDENT: [a-z] [a-z0-9\-]*;
+LOWER_IDENT: ([a-z] | '#' | '.' ) [a-z0-9\-]*;
 // Currently using for : variable names
 CAPITAL_IDENT: [A-Z] [A-Za-z0-9_]*;
 
 // If whitespace is tokenized -> skips it (So the parser doesn't have to do anything with it)
+// Or is it just not tokenized at all? (Seems like it)
 WS: [ \t\r\n]+ -> skip;
 
 // Generic Syntaxis
@@ -57,14 +58,15 @@ statement
     | selectorstmt
     ;
 
-// Top-level math expression (entrypoint)
+
 mathExpr
     : additionExpr
+    | multiplicationExpr
     ;
 
 // Allows for multiplication at the start, or just directly a plus or minus, and multiplication at the end. (Repeating it so you can build it as long as you want)
 additionExpr
-    : multiplicationExpr ((PLUS | MIN) multiplicationExpr)*
+    : multiplicationExpr ((PLUS | MIN) multiplicationExpr)+
     ;
 
 // Define the starting operand to work with, and add the MUL operator if it's there.
@@ -86,7 +88,10 @@ mathValue
     | PIXELSIZE
     ;
 
+// Top-level math expression (entrypoint)
+
 // Define variables (Can include math expressions, or just a plain literal)
+// Will be handling checking of the type a bit better in the checker, otherwise the parse tree might be a bit... fun to navigate.
 variabledef
     : CAPITAL_IDENT ASSIGNMENT_OPERATOR (value | mathExpr) SEMICOLON
     ;
@@ -102,15 +107,18 @@ value
 
 // Selector (CSS) block
 selectorstmt
-    : (LOWER_IDENT | CAPITAL_IDENT | ID_IDENT | CLASS_IDENT) OPEN_BRACE (ifstmt | propertyexpr | variabledef)* CLOSE_BRACE
+    : (LOWER_IDENT | CAPITAL_IDENT) OPEN_BRACE (ifstmt | propertyexpr | variabledef)* CLOSE_BRACE
     ;
 
 // Checks for the property to set (width, height, color, background-color) & only allows the correct values to be used
 propertyexpr
     : (COLOR_PROPERTY COLON (HEXVAL | CAPITAL_IDENT)
-       | DIM_PROPERTY COLON ((PIXELSIZE | CAPITAL_IDENT) | (PERCENTAGE | mathExpr))
+       | DIM_PROPERTY COLON (PIXELSIZE | CAPITAL_IDENT | PERCENTAGE | mathExpr)
       ) SEMICOLON
     ;
+
+
+
 
 // if-else statements (Currently not expecting nested logic, need to ask)
 ifstmt
