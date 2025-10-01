@@ -129,6 +129,9 @@ propertyexpr
 // if-else statements (Currently not expecting nested logic, need to ask)
 ifstmt
     : IF BOX_BRACKET_OPEN (BOOLEAN | CAPITAL_IDENT) BOX_BRACKET_CLOSE OPEN_BRACE
-        (propertyexpr | variabledef | ifstmt)* CLOSE_BRACE
-      (ELSE OPEN_BRACE (propertyexpr | variabledef | ifstmt)* CLOSE_BRACE)?
+        (propertyexpr | variabledef | ifstmt)* CLOSE_BRACE elsestmt?
+    ;
+
+elsestmt
+    : ELSE OPEN_BRACE (propertyexpr | variabledef | ifstmt)* CLOSE_BRACE
     ;
