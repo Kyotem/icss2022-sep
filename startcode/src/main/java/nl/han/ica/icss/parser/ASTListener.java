@@ -168,7 +168,7 @@ public class ASTListener extends ICSSBaseListener {
 			BoolLiteral boolValue = new BoolLiteral(ctx.BOOLEAN().getText());
 			variableAssignment.addChild(boolValue);
 		}
-		
+
 	}
 
 	@Override
@@ -177,6 +177,28 @@ public class ASTListener extends ICSSBaseListener {
 		currentContainer.peek().addChild(variableAssignment);
 
 	}
+
+	@Override
+	public void enterIfstmt(ICSSParser.IfstmtContext ctx) {
+
+		IfClause ifClause = new IfClause();
+		if (ctx.CAPITAL_IDENT() != null) {
+			ifClause.addChild(new VariableReference(ctx.CAPITAL_IDENT().getText()));
+		} else if (ctx.BOOLEAN() != null) {
+			ifClause.addChild(new BoolLiteral(ctx.BOOLEAN().getText()));
+		}
+
+		currentContainer.push(ifClause);
+	}
+
+	@Override
+	public void exitIfstmt(ICSSParser.IfstmtContext ctx) {
+		IfClause ifClause = (IfClause) currentContainer.pop();
+		currentContainer.peek().addChild(ifClause);
+	}
+
+
+
 
 //	@Override
 //	public void enterValue(ICSSParser.ValueContext ctx) {
