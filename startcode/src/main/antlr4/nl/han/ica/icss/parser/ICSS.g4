@@ -93,16 +93,21 @@ mathValue
 // Define variables (Can include math expressions, or just a plain literal)
 // Will be handling checking of the type a bit better in the checker, otherwise the parse tree might be a bit... fun to navigate.
 variabledef
-    : CAPITAL_IDENT ASSIGNMENT_OPERATOR (value | mathExpr) SEMICOLON
+    : CAPITAL_IDENT ASSIGNMENT_OPERATOR (colorValue | dimensionValue | mathExpr) SEMICOLON
     ;
 
 // Wrapping values for re-usability
-value
-    : BOOLEAN
-    | PIXELSIZE
-    | PERCENTAGE
+colorValue
+    : HEXVAL
+    | CAPITAL_IDENT
+    ;
+
+dimensionValue
+    : PIXELSIZE
     | SCALAR
-    | HEXVAL
+    | PERCENTAGE
+    | CAPITAL_IDENT
+    | mathExpr
     ;
 
 // Selector (CSS) block
@@ -112,10 +117,11 @@ selectorstmt
 
 // Checks for the property to set (width, height, color, background-color) & only allows the correct values to be used
 propertyexpr
-    : (COLOR_PROPERTY COLON (HEXVAL | CAPITAL_IDENT)
-       | DIM_PROPERTY COLON (PIXELSIZE | CAPITAL_IDENT | PERCENTAGE | mathExpr)
-      ) SEMICOLON
+    : COLOR_PROPERTY COLON colorValue SEMICOLON
+    | DIM_PROPERTY   COLON (dimensionValue | mathExpr) SEMICOLON
     ;
+
+
 
 
 

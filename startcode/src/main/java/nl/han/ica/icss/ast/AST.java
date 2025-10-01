@@ -32,6 +32,13 @@ public class AST {
 	        collectErrors(errors,child);
         }
     }
+
+	// TODO: Generic extending ASTNode or just ASTNode?
+	public void addNode(ASTNode node) {
+
+
+	}
+
 	@Override
 	public String toString() {
 		return root.toString();
