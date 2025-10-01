@@ -111,8 +111,13 @@ public class ASTListener extends ICSSBaseListener {
 	@Override
 	public void exitColorValue(ICSSParser.ColorValueContext ctx) {
 		ASTNode value = currentContainer.pop();
-		Declaration declaration = (Declaration) currentContainer.peek();
-		declaration.addChild(value);
+		ASTNode parent = currentContainer.peek();
+
+		if (parent instanceof Declaration) {
+			((Declaration) parent).addChild(value);
+		} else if (parent instanceof VariableAssignment) {
+			((VariableAssignment) parent).addChild((Expression) value);
+		}
 	}
 
 
@@ -139,8 +144,38 @@ public class ASTListener extends ICSSBaseListener {
 	@Override
 	public void exitDimensionValue(ICSSParser.DimensionValueContext ctx) {
 		ASTNode value = currentContainer.pop();
-		Declaration declaration = (Declaration) currentContainer.peek();
-		declaration.addChild(value);
+		ASTNode parent = currentContainer.peek();
+
+		if (parent instanceof Declaration) {
+			((Declaration) parent).addChild(value);
+		} else if (parent instanceof VariableAssignment) {
+			((VariableAssignment) parent).addChild((Expression) value);
+		}
+	}
+
+
+	@Override
+	public void enterVariabledef(ICSSParser.VariabledefContext ctx) {
+
+		VariableAssignment variableAssignment = new VariableAssignment();
+		currentContainer.push(variableAssignment);
+
+		VariableReference varRef = new VariableReference(ctx.CAPITAL_IDENT().getText());
+		variableAssignment.addChild(varRef);
+
+		// FIXME: Separation of concern is not handled properly (Don't want ot handle this here because it will result in duplicate & pot inefficient code) -> Look into this when also fixing math expressions
+		if (ctx.BOOLEAN() != null) {
+			BoolLiteral boolValue = new BoolLiteral(ctx.BOOLEAN().getText());
+			variableAssignment.addChild(boolValue);
+		}
+		
+	}
+
+	@Override
+	public void exitVariabledef(ICSSParser.VariabledefContext ctx) {
+		VariableAssignment  variableAssignment  = (VariableAssignment ) currentContainer.pop();
+		currentContainer.peek().addChild(variableAssignment);
+
 	}
 
 //	@Override

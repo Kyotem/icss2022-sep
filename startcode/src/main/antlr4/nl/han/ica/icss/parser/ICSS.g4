@@ -93,7 +93,7 @@ mathValue
 // Define variables (Can include math expressions, or just a plain literal)
 // Will be handling checking of the type a bit better in the checker, otherwise the parse tree might be a bit... fun to navigate.
 variabledef
-    : CAPITAL_IDENT ASSIGNMENT_OPERATOR (colorValue | dimensionValue | mathExpr) SEMICOLON
+    : CAPITAL_IDENT ASSIGNMENT_OPERATOR (colorValue | dimensionValue | BOOLEAN | mathExpr) SEMICOLON
     ;
 
 // Wrapping values for re-usability
