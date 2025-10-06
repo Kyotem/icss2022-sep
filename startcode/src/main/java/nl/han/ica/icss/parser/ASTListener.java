@@ -126,20 +126,24 @@ public class ASTListener extends ICSSBaseListener {
 	public void enterDimensionValue(ICSSParser.DimensionValueContext ctx) {
 		ASTNode value = null;
 
-		if (ctx.PIXELSIZE() != null) {
-			value = new PixelLiteral(ctx.PIXELSIZE().getText());
-		} else if (ctx.SCALAR() != null) {
-			value = new ScalarLiteral(ctx.SCALAR().getText());
-		} else if (ctx.PERCENTAGE() != null) {
-			value = new PercentageLiteral(ctx.PERCENTAGE().getText());
+		if (ctx.numberLiteral() != null) {
+			ICSSParser.NumberLiteralContext numCtx = ctx.numberLiteral();
+
+			if (numCtx.PIXELSIZE() != null) {
+				value = new PixelLiteral(numCtx.PIXELSIZE().getText());
+			} else if (numCtx.SCALAR() != null) {
+				value = new ScalarLiteral(numCtx.SCALAR().getText());
+			} else if (numCtx.PERCENTAGE() != null) {
+				value = new PercentageLiteral(numCtx.PERCENTAGE().getText());
+			}
+
 		} else if (ctx.CAPITAL_IDENT() != null) {
 			value = new VariableReference(ctx.CAPITAL_IDENT().getText());
-		} else if (ctx.mathExpr() != null) {
-			// FIXME: Handle mathExpr later, sepaarte func or whatever
 		}
 
 		currentContainer.push(value);
 	}
+
 
 	@Override
 	public void exitDimensionValue(ICSSParser.DimensionValueContext ctx) {
