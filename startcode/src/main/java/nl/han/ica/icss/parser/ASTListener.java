@@ -55,16 +55,23 @@ public class ASTListener extends ICSSBaseListener {
 	public void enterSelectorstmt(ICSSParser.SelectorstmtContext ctx) {
 		Stylerule stylerule = new Stylerule();
 
-		// FIXME: Currently not making any difference between the TAG and CLASS or ID, can check starting point of string.. why not use one class?
-		// Ask about it (Can I modify test / classes to have just ONE?)
 		if (ctx.LOWER_IDENT() != null) {
-			TagSelector selector = new TagSelector(ctx.LOWER_IDENT().getText());
+
+			String selectorString = ctx.LOWER_IDENT().getText();
+			Selector selector = null;
+
+			// Check for selector type
+			if (selectorString.startsWith("#")) {
+				selector = new IdSelector(selectorString);
+			} else if (selectorString.startsWith(".")) {
+				selector = new ClassSelector(selectorString);
+			} else {
+				selector = new TagSelector(selectorString);
+			}
+
 			stylerule.addChild(selector);
-		} else if (ctx.CAPITAL_IDENT() != null) {
-			TagSelector selector = new TagSelector(ctx.CAPITAL_IDENT().getText());
-			stylerule.addChild(selector);
+			currentContainer.push(stylerule);
 		}
-		currentContainer.push(stylerule);
 	}
 
 	@Override
@@ -90,8 +97,12 @@ public class ASTListener extends ICSSBaseListener {
 	@Override
 	public void exitPropertyexpr(ICSSParser.PropertyexprContext ctx) {
 		Declaration declaration = (Declaration) currentContainer.pop();
+
+		// NOTE: Not doing any checks based on the previous node here, och, is a reocurring theme, but make sure that later additions will not mess with it. (SCV:1)
+		// Assuming all logic per each section is properly separated this should not be a problem, so set up code efficiëntly.
 		currentContainer.peek().addChild(declaration);
 	}
+
 
 	@Override
 	public void enterColorValue(ICSSParser.ColorValueContext ctx) {
@@ -214,79 +225,64 @@ public class ASTListener extends ICSSBaseListener {
 	}
 
 
+	@Override
+	public void enterExpr(ICSSParser.ExprContext ctx) {
 
-//	@Override
-//	public void enterValue(ICSSParser.ValueContext ctx) {
-//		ASTNode value = null;
-//
-//		// FIXME: Can this be done easier with generics? God knows.
-//		if (ctx.BOOLEAN() != null) {
-//			value = new BoolLiteral(ctx.BOOLEAN().getText());
-//		} else if (ctx.PIXELSIZE() != null) {
-//			value = new PixelLiteral(ctx.PIXELSIZE().getText());
-//		} else if (ctx.PERCENTAGE() != null) {
-//			value = new PercentageLiteral(ctx.PERCENTAGE().getText());
-//		} else if (ctx.SCALAR() != null) {
-//			value = new ScalarLiteral(ctx.SCALAR().getText());
-//		} else
-//
-//		// TODO: Add support for mathexpressions (Not sure if it has to be handled in this declaration)
-//		currentContainer.push(value);
-//	}
-//
-//	@Override
-//	public void exitValue(ICSSParser.ValueContext ctx) {
-//		ASTNode value = currentContainer.pop();
-//		Declaration declaration = (Declaration) currentContainer.peek();
-//		declaration.addChild(value);
-//	}
+		// Grammar indicates that multiplication is always first so keep check in-sequence!
+		if (ctx.MUL() != null) {
+			currentContainer.push(new MultiplyOperation());
+		} else if (ctx.PLUS() != null) {
+			currentContainer.push(new AddOperation());
+		} else if (ctx.MIN() != null) {
+			currentContainer.push(new SubtractOperation());
+		}
+	}
 
+	@Override
+	public void exitExpr(ICSSParser.ExprContext ctx) {
 
+		if (ctx.MUL() != null || ctx.PLUS() != null || ctx.MIN() != null) {
+			ASTNode operatorNode = currentContainer.pop(); // Can't instantiate Operator class, so just using ASTNode generically. Prev check is therefore necessary.
+			ASTNode parent = currentContainer.peek();
 
-
-
-
+			// Check for context where the expression is being done (e.g., Inside of a property expr, variable, etc)
+			if (parent instanceof Expression) { // Nested math expr
+				((Expression) parent).addChild(operatorNode);
+			} else if (parent instanceof Declaration) { // Under a propertyExpr
+				((Declaration) parent).addChild(operatorNode);
+			} else if (parent instanceof VariableAssignment) { // Under a variable assignment
+				((VariableAssignment) parent).addChild((Expression) operatorNode);
+			}
+		}
+	}
 
 
+	/* FIXME: This is stupid.
+	Practically duplicating a lot of checking code, either separate concerns per parser rules (abstract more)
+	Or introduce helper functions.
 
+	Not to mention this breaks the entry-exit structure on the stack. Not adhering to pattern and likely not flexible.
+	 */
+	@Override
+	public void exitFactor(ICSSParser.FactorContext ctx) {
 
+		ASTNode node;
 
-//	@Override
-//	public void enterVariabledef(ICSSParser.VariabledefContext ctx) {
-//
-//		Token capitalIdentToken = ctx.CAPITAL_IDENT().getSymbol();
-//
-//		String varname = capitalIdentToken.getText()
-//
-//
-//		System.out.println("Found variable: " + varname);
-//	}
+		// Value check
+		if (ctx.CAPITAL_IDENT() != null) {
+			node = new VariableReference(ctx.CAPITAL_IDENT().getText());
+		} else if (ctx.SCALAR() != null) {
+			node = new ScalarLiteral(ctx.SCALAR().getText());
+		} else if (ctx.PERCENTAGE() != null) {
+			node = new PercentageLiteral(ctx.PERCENTAGE().getText());
+		} else if (ctx.PIXELSIZE() != null) {
+			node = new PixelLiteral(ctx.PIXELSIZE().getText());
+		} else {
+			return;
+		}
 
-//	@Override
-//	public void enterValue(ICSSParser.ValueContext ctx) {
-//		String value = extractValue(ctx);
-//
-//		System.out.println("Found value: " + value);
-//	}
-//
-//	// This feels stupid
-//	public String extractValue(ICSSParser.ValueContext ctx) {
-//		if (ctx.BOOLEAN() != null) {
-//			return ctx.BOOLEAN().getText();
-//		} else if (ctx.PIXELSIZE() != null) {
-//			return ctx.PIXELSIZE().getText();
-//		} else if (ctx.PERCENTAGE() != null) {
-//			return ctx.PERCENTAGE().getText();
-//		} else if (ctx.SCALAR() != null) {
-//			return ctx.SCALAR().getText();
-//		} else if (ctx.HEXVAL() != null) {
-//			return ctx.HEXVAL().getText();
-//		}
-//
-//		return null;
-//	}
-
-
+		currentContainer.peek().addChild(node);
+	}
 
 	public AST getAST() {
         return ast;

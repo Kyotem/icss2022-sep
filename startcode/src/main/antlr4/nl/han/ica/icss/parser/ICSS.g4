@@ -59,27 +59,24 @@ statement
     | selectorstmt
     ;
 
+// Math expressions
 mathExpr
-    : additionExpr
+    : expr
+    ;
+
+expr
+    : factor | expr MUL expr | expr (PLUS | MIN) expr
     ;
 
 
-// Allows for multiplication at the start, or just directly a plus or minus, and multiplication at the end. (Repeating it so you can build it as long as you want)
-additionExpr
-    : multiplicationExpr ((PLUS | MIN) multiplicationExpr)*
-    ;
-
-// Define the starting operand to work with, and add the MUL operator if it's there.
-// So technically even it's the 'multiplicationExpr', we aren't always appending a * operator.
-multiplicationExpr
-    : mathOperand (MUL mathOperand)*
-    ;
-
-// Base units or variables
-mathOperand
-    : numberLiteral
+// Really REALLY duplicated, will hav e to refactor big time and make it tidy and neat
+factor
+    : SCALAR
+    | PERCENTAGE
+    | PIXELSIZE
     | CAPITAL_IDENT
     ;
+// ---
 
 // Top-level math expression (entrypoint)
 
@@ -98,7 +95,6 @@ colorValue
 dimensionValue
     : numberLiteral
     | CAPITAL_IDENT
-    | mathExpr
     ;
 
 // Only values allowed for mathmathical evaluations (Can this be condensed? feels like im duplicating code)
@@ -110,7 +106,7 @@ numberLiteral
 
 // Selector (CSS) block
 selectorstmt
-    : (LOWER_IDENT | CAPITAL_IDENT) OPEN_BRACE (ifstmt | propertyexpr | variabledef)* CLOSE_BRACE
+    : LOWER_IDENT OPEN_BRACE (ifstmt | propertyexpr | variabledef)* CLOSE_BRACE
     ;
 
 // Checks for the property to set (width, height, color, background-color) & only allows the correct values to be used
@@ -118,11 +114,6 @@ propertyexpr
     : COLOR_PROPERTY COLON colorValue SEMICOLON
     | DIM_PROPERTY   COLON (dimensionValue | mathExpr) SEMICOLON
     ;
-
-
-
-
-
 
 // if-else statements (Currently not expecting nested logic, need to ask)
 ifstmt
