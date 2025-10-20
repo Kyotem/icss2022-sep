@@ -68,7 +68,6 @@ expr
     : factor | expr MUL expr | expr (PLUS | MIN) expr
     ;
 
-
 // Really REALLY duplicated, will hav e to refactor big time and make it tidy and neat
 factor
     : SCALAR
@@ -78,12 +77,9 @@ factor
     ;
 // ---
 
-// Top-level math expression (entrypoint)
-
 // Define variables (Can include math expressions, or just a plain literal)
-// Will be handling checking of the type a bit better in the checker, otherwise the parse tree might be a bit... fun to navigate.
 variabledef
-    : CAPITAL_IDENT ASSIGNMENT_OPERATOR (colorValue | dimensionValue | BOOLEAN | mathExpr) SEMICOLON
+    : CAPITAL_IDENT ASSIGNMENT_OPERATOR (colorValue | factor | BOOLEAN | mathExpr) SEMICOLON
     ;
 
 // Wrapping values for re-usability
@@ -92,30 +88,22 @@ colorValue
     | CAPITAL_IDENT
     ;
 
-dimensionValue
-    : numberLiteral
-    | CAPITAL_IDENT
-    ;
-
-// Only values allowed for mathmathical evaluations (Can this be condensed? feels like im duplicating code)
-numberLiteral
-    : SCALAR
-    | PERCENTAGE
-    | PIXELSIZE
-    ;
-
-// Selector (CSS) block
+/*
+ Selector (CSS) block (Takes any lowercase set of characters,
+ checking for '#' and '.' is done in the conversion from parser tree to AST
+ */
 selectorstmt
     : LOWER_IDENT OPEN_BRACE (ifstmt | propertyexpr | variabledef)* CLOSE_BRACE
     ;
 
-// Checks for the property to set (width, height, color, background-color) & only allows the correct values to be used
+// Expressions for setting properties (e.g., width, height) and only allow grouped values. (Allow hexvals for colors, dimvals/math for dimensions)
 propertyexpr
     : COLOR_PROPERTY COLON colorValue SEMICOLON
-    | DIM_PROPERTY   COLON (dimensionValue | mathExpr) SEMICOLON
+    | DIM_PROPERTY   COLON (factor | mathExpr) SEMICOLON
     ;
 
-// if-else statements (Currently not expecting nested logic, need to ask)
+
+// if-else statements (Allow property expressions, variable definitions and nested if-statements)
 ifstmt
     : IF BOX_BRACKET_OPEN (BOOLEAN | CAPITAL_IDENT) BOX_BRACKET_CLOSE OPEN_BRACE
         (propertyexpr | variabledef | ifstmt)* CLOSE_BRACE elsestmt?
@@ -124,3 +112,4 @@ ifstmt
 elsestmt
     : ELSE OPEN_BRACE (propertyexpr | variabledef | ifstmt)* CLOSE_BRACE
     ;
+// ---

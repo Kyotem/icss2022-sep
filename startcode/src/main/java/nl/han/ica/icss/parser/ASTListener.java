@@ -13,6 +13,7 @@ import nl.han.ica.icss.ast.operations.SubtractOperation;
 import nl.han.ica.icss.ast.selectors.ClassSelector;
 import nl.han.ica.icss.ast.selectors.IdSelector;
 import nl.han.ica.icss.ast.selectors.TagSelector;
+import org.antlr.v4.runtime.ParserRuleContext;
 import org.antlr.v4.runtime.Token;
 
 /**
@@ -26,19 +27,15 @@ public class ASTListener extends ICSSBaseListener {
 	//Use this to keep track of the parent nodes when recursively traversing the ast
 	private IHANStack<ASTNode> currentContainer;
 
-	// Might need pre-order traversal if copying, not sure how this will translate onto the stack, still need to research to convert Parse Tree to AST.
-	// Assume with no error nodes in the Parse Tree that it's safe to convert to an AST (So no extra checking required)
-	// ! W6L1 ! Important
 	public ASTListener() {
 		ast = new AST();
 
 		currentContainer = new HANStack();
 	}
 
-	// TODO: Currently I don't support class and id selectors, don't see why I should specifically..
-	// Will fail the ICSS0 test now, will need to ask whether or not I must implement this. (As there logically isn't
-	// any difference between the input and generated content nor within the inner functionality.
+	// NOTE: Currently I have to typecast on every exit event to the type of node it should be,
 
+	// Root
 	@Override
 	public void enterStylesheet(ICSSParser.StylesheetContext ctx) {
 		Stylesheet stylesheet = new Stylesheet();
@@ -76,13 +73,12 @@ public class ASTListener extends ICSSBaseListener {
 
 	@Override
 	public void exitSelectorstmt(ICSSParser.SelectorstmtContext ctx) {
-		Stylerule stylerule = (Stylerule) currentContainer.pop();
-		currentContainer.peek().addChild(stylerule);
+		attachLatestOnStackToParent();
 	}
 
 	@Override
 	public void enterPropertyexpr(ICSSParser.PropertyexprContext ctx) {
-		String propertyName = null;
+		String propertyName = null; // FIXME: Need a nullcheck
 
 		if (ctx.COLOR_PROPERTY() != null) {
 			propertyName = ctx.COLOR_PROPERTY().getText();
@@ -96,14 +92,10 @@ public class ASTListener extends ICSSBaseListener {
 
 	@Override
 	public void exitPropertyexpr(ICSSParser.PropertyexprContext ctx) {
-		Declaration declaration = (Declaration) currentContainer.pop();
-
-		// NOTE: Not doing any checks based on the previous node here, och, is a reocurring theme, but make sure that later additions will not mess with it. (SCV:1)
-		// Assuming all logic per each section is properly separated this should not be a problem, so set up code efficiëntly.
-		currentContainer.peek().addChild(declaration);
+		attachLatestOnStackToParent();
 	}
 
-
+	// NOTE: Colorvalue is handled as a separated parser rule, dimensional values is handled under 'factor' per parser.
 	@Override
 	public void enterColorValue(ICSSParser.ColorValueContext ctx) {
 		ASTNode value = null;
@@ -117,55 +109,9 @@ public class ASTListener extends ICSSBaseListener {
 		currentContainer.push(value);
 	}
 
-
-
 	@Override
 	public void exitColorValue(ICSSParser.ColorValueContext ctx) {
-		ASTNode value = currentContainer.pop();
-		ASTNode parent = currentContainer.peek();
-
-		if (parent instanceof Declaration) {
-			((Declaration) parent).addChild(value);
-		} else if (parent instanceof VariableAssignment) {
-			((VariableAssignment) parent).addChild((Expression) value);
-		}
-	}
-
-
-
-	@Override
-	public void enterDimensionValue(ICSSParser.DimensionValueContext ctx) {
-		ASTNode value = null;
-
-		if (ctx.numberLiteral() != null) {
-			ICSSParser.NumberLiteralContext numCtx = ctx.numberLiteral();
-
-			if (numCtx.PIXELSIZE() != null) {
-				value = new PixelLiteral(numCtx.PIXELSIZE().getText());
-			} else if (numCtx.SCALAR() != null) {
-				value = new ScalarLiteral(numCtx.SCALAR().getText());
-			} else if (numCtx.PERCENTAGE() != null) {
-				value = new PercentageLiteral(numCtx.PERCENTAGE().getText());
-			}
-
-		} else if (ctx.CAPITAL_IDENT() != null) {
-			value = new VariableReference(ctx.CAPITAL_IDENT().getText());
-		}
-
-		currentContainer.push(value);
-	}
-
-
-	@Override
-	public void exitDimensionValue(ICSSParser.DimensionValueContext ctx) {
-		ASTNode value = currentContainer.pop();
-		ASTNode parent = currentContainer.peek();
-
-		if (parent instanceof Declaration) {
-			((Declaration) parent).addChild(value);
-		} else if (parent instanceof VariableAssignment) {
-			((VariableAssignment) parent).addChild((Expression) value);
-		}
+		attachLatestOnStackToParent();
 	}
 
 
@@ -188,15 +134,16 @@ public class ASTListener extends ICSSBaseListener {
 
 	@Override
 	public void exitVariabledef(ICSSParser.VariabledefContext ctx) {
-		VariableAssignment  variableAssignment  = (VariableAssignment ) currentContainer.pop();
-		currentContainer.peek().addChild(variableAssignment);
-
+		attachLatestOnStackToParent();
 	}
 
+	// if - else statements
 	@Override
 	public void enterIfstmt(ICSSParser.IfstmtContext ctx) {
 
 		IfClause ifClause = new IfClause();
+
+		// Parse either a Variable or a Boolean value.
 		if (ctx.CAPITAL_IDENT() != null) {
 			ifClause.addChild(new VariableReference(ctx.CAPITAL_IDENT().getText()));
 		} else if (ctx.BOOLEAN() != null) {
@@ -208,8 +155,7 @@ public class ASTListener extends ICSSBaseListener {
 
 	@Override
 	public void exitIfstmt(ICSSParser.IfstmtContext ctx) {
-		IfClause ifClause = (IfClause) currentContainer.pop();
-		currentContainer.peek().addChild(ifClause);
+		attachLatestOnStackToParent();
 	}
 
 	@Override
@@ -220,39 +166,22 @@ public class ASTListener extends ICSSBaseListener {
 
 	@Override
 	public void exitElsestmt(ICSSParser.ElsestmtContext ctx) {
-		ElseClause elseClause = (ElseClause) currentContainer.pop();
-		currentContainer.peek().addChild(elseClause);
+		attachLatestOnStackToParent();
 	}
-
+	// ----
 
 	@Override
 	public void enterExpr(ICSSParser.ExprContext ctx) {
-
-		// Grammar indicates that multiplication is always first so keep check in-sequence!
-		if (ctx.MUL() != null) {
-			currentContainer.push(new MultiplyOperation());
-		} else if (ctx.PLUS() != null) {
-			currentContainer.push(new AddOperation());
-		} else if (ctx.MIN() != null) {
-			currentContainer.push(new SubtractOperation());
-		}
+		Operation op = createOperation(ctx);
+		if (op != null) currentContainer.push(op);
 	}
 
+	// Math Handling
 	@Override
 	public void exitExpr(ICSSParser.ExprContext ctx) {
 
 		if (ctx.MUL() != null || ctx.PLUS() != null || ctx.MIN() != null) {
-			ASTNode operatorNode = currentContainer.pop(); // Can't instantiate Operator class, so just using ASTNode generically. Prev check is therefore necessary.
-			ASTNode parent = currentContainer.peek();
-
-			// Check for context where the expression is being done (e.g., Inside of a property expr, variable, etc)
-			if (parent instanceof Expression) { // Nested math expr
-				((Expression) parent).addChild(operatorNode);
-			} else if (parent instanceof Declaration) { // Under a propertyExpr
-				((Declaration) parent).addChild(operatorNode);
-			} else if (parent instanceof VariableAssignment) { // Under a variable assignment
-				((VariableAssignment) parent).addChild((Expression) operatorNode);
-			}
+			attachLatestOnStackToParent();
 		}
 	}
 
@@ -264,25 +193,54 @@ public class ASTListener extends ICSSBaseListener {
 	Not to mention this breaks the entry-exit structure on the stack. Not adhering to pattern and likely not flexible.
 	 */
 	@Override
+	public void enterFactor(ICSSParser.FactorContext ctx) {
+		currentContainer.push(buildLiteralFromContext(ctx));
+	}
+
+	@Override
 	public void exitFactor(ICSSParser.FactorContext ctx) {
+		attachLatestOnStackToParent();
+	}
+	// ----
 
-		ASTNode node;
 
-		// Value check
-		if (ctx.CAPITAL_IDENT() != null) {
-			node = new VariableReference(ctx.CAPITAL_IDENT().getText());
-		} else if (ctx.SCALAR() != null) {
-			node = new ScalarLiteral(ctx.SCALAR().getText());
+	// Helper functions
+
+	// Just a separation in-case for re-usability & just readability in general.
+	private Operation createOperation(ICSSParser.ExprContext ctx) {
+		if (ctx.MUL() != null) return new MultiplyOperation();
+		if (ctx.PLUS() != null) return new AddOperation();
+		if (ctx.MIN() != null) return new SubtractOperation();
+		return null;
+	}
+
+
+	// Currently only implemented on 'factor', can this be used on other places?
+	// Can't use ParserRuleContext + getToken because it would result in walking the parse tree multiple times (Not fast!)
+	// NOTE: So using it only for factorcontext, calling an extra function takes up more stack space, but is more readable!
+	private ASTNode buildLiteralFromContext(ICSSParser.FactorContext ctx) {
+		if (ctx == null) return null;
+
+		if (ctx.PIXELSIZE() != null) {
+			return new PixelLiteral(ctx.PIXELSIZE().getText());
 		} else if (ctx.PERCENTAGE() != null) {
-			node = new PercentageLiteral(ctx.PERCENTAGE().getText());
-		} else if (ctx.PIXELSIZE() != null) {
-			node = new PixelLiteral(ctx.PIXELSIZE().getText());
-		} else {
-			return;
+			return new PercentageLiteral(ctx.PERCENTAGE().getText());
+		} else if (ctx.SCALAR() != null) {
+			return new ScalarLiteral(ctx.SCALAR().getText());
+		} else if (ctx.CAPITAL_IDENT() != null) {
+			return new VariableReference(ctx.CAPITAL_IDENT().getText());
 		}
 
+		return null;
+	}
+	
+	// Doing this so I don't have to typecast in every entry/exit conditions to centralize it a bit more.
+	// This means I won't do specific typecasting to classes that extend ASTNode (etc), so it might make it less readable, but this significantly reduces code count.
+	private void attachLatestOnStackToParent() {
+		ASTNode node = (ASTNode) currentContainer.pop();
 		currentContainer.peek().addChild(node);
 	}
+
 
 	public AST getAST() {
         return ast;
