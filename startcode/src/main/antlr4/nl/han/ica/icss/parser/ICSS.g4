@@ -1,6 +1,8 @@
 grammar ICSS;
 
 //--- LEXER: ---
+// TODO: variabledef and propertyexpr take way too long to evaluate for level3.icss for example. (0.5 and 0.3 respectively) Might need to improve on this later.
+
 
 // IF
 IF: 'if';

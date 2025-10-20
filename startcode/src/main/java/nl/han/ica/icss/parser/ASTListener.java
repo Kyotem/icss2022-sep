@@ -233,7 +233,7 @@ public class ASTListener extends ICSSBaseListener {
 
 		return null;
 	}
-	
+
 	// Doing this so I don't have to typecast in every entry/exit conditions to centralize it a bit more.
 	// This means I won't do specific typecasting to classes that extend ASTNode (etc), so it might make it less readable, but this significantly reduces code count.
 	private void attachLatestOnStackToParent() {
