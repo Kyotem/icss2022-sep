@@ -33,11 +33,6 @@ public class AST {
         }
     }
 
-	// TODO: Generic extending ASTNode or just ASTNode?
-	public void addNode(ASTNode node) {
-
-
-	}
 
 	@Override
 	public String toString() {
