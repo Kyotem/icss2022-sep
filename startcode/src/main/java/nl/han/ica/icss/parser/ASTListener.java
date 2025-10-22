@@ -121,6 +121,7 @@ public class ASTListener extends ICSSBaseListener {
 		VariableAssignment variableAssignment = new VariableAssignment();
 		currentContainer.push(variableAssignment);
 
+		// NOTE: Uhh was it intended to set the reference under an assignment? Seems redundant.
 		VariableReference varRef = new VariableReference(ctx.CAPITAL_IDENT().getText());
 		variableAssignment.addChild(varRef);
 

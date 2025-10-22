@@ -1,11 +1,11 @@
 package nl.han.ica.datastructures;
 
-public class HanLinkedList<T> implements IHANLinkedList {
+public class HANLinkedList<T> implements IHANLinkedList {
 
     private LinkedListNode<T> head;
     private int size;
 
-    public HanLinkedList() {
+    public HANLinkedList() {
         head = null;
         size = 0;
     }
