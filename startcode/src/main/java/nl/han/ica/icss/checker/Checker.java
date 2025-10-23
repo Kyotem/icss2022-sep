@@ -3,9 +3,28 @@ package nl.han.ica.icss.checker;
 import nl.han.ica.datastructures.HANLinkedList;
 import nl.han.ica.datastructures.IHANLinkedList;
 import nl.han.ica.icss.ast.*;
+import nl.han.ica.icss.ast.literals.*;
 import nl.han.ica.icss.ast.types.ExpressionType;
 
 import java.util.HashMap;
+
+/*
+Implemented:
+    - CH01
+    - CH04
+    - CH05
+    - CH06 ~ (Partial, still broken on if-clauses)
+TODO:
+    - CH02
+    - CH03
+    - CH06 (Fix if-clauses)
+    - In-Depth test (Also document it)
+
+NOTES:
+ - Code is a bit messy (E.g., not ordered) -> Might have to resolve this down the line for readability.
+ - Might be good to document standard flow as well, doubt i'll remember this if I pause for a few days.
+
+ */
 
 public class Checker {
 
@@ -27,19 +46,19 @@ public class Checker {
 
         if (node == null) return; // Guard
 
-        if (node instanceof IfClause) {
+        if (node instanceof IfClause) { // FIXME: Scoping for if-clauses is a bit broken right now, will have to fix down the line.
             checkIfClause((IfClause) node);
             return;
         }
 
         boolean newScopePushed = false;
 
-        if (node instanceof Stylerule || node instanceof ElseClause) { // Push new scope
+        if (node instanceof Stylerule || node instanceof ElseClause) { // Push new scope (D1)
             variableTypes.addFirst(new HashMap<String, ExpressionType>());
             newScopePushed = true;
         }
 
-        // In-Order traversal
+        // Traverse AST
         for (ASTNode child : node.getChildren()) {
 
             // Skip variablereferences that are nested inside of variableassignments. (Still don't know why var reference has to be defined in an assignment? OH well.
@@ -56,6 +75,11 @@ public class Checker {
             if (child instanceof VariableAssignment) {
                 handleVariableAssignment((VariableAssignment) child);
             }
+
+            // Check properties (e.g., width, color)
+            if (child instanceof Declaration) {
+                checkDeclaration((Declaration) child);
+            }
         }
 
         if (newScopePushed) { // Pop scope when leaving the scope-context
@@ -63,45 +87,80 @@ public class Checker {
         }
     }
 
+
+    // Check for declarations (e.g., Width, Color, etc)
+    // NOTE: I'm only checking variables used for declarations, the parser makes sure declarations can't have any wrong types (e.g., hexvals in dimensional declarations are not possible, unless done by variable, which is checked here)
+    private void checkDeclaration(Declaration decl) {
+        if (decl.expression == null) return; // Guard
+
+        // This list contains all allowed types of 'ExpressionType' a property may have. (e.g, Dimension properties can have SCALAR, PERCENTAGE, but if-clause only a BOOLEAN)
+        ExpressionType[] expectedTypes = getExpectedPropertyTypes(decl.property.name);
+
+        if (decl.expression instanceof VariableReference) {
+
+            VariableReference ref = (VariableReference) decl.expression;
+            ExpressionType actualType = resolveVariableType(ref.name);
+
+            if (actualType == ExpressionType.UNDEFINED) { // Variable not defined or type not properly set IN a 'declaration'
+                ref.setError("Variable '" + ref.name + "' is not defined or has unknown type.");
+            } else if (!isTypeAllowed(actualType, expectedTypes)) { // Compare type of the variable to the declaration it's being used in.
+                decl.setError("Property '" + decl.property.name + "' expects one of " +
+                        formatAllowedTypes(expectedTypes) + " but got " + actualType + ".");
+            }
+        }
+    }
+
+
+    // Mapping property names to their respective expression types that are allowed.
+    private ExpressionType[] getExpectedPropertyTypes(String propertyName) {
+        if (propertyName == null) return new ExpressionType[]{ExpressionType.UNDEFINED}; // Guard
+
+        // NOTE: Switch is probably most readable in this case, not sure if it's the fastest though... will have to look into it.
+        switch (propertyName) {
+            case "color":
+            case "background-color":
+                return new ExpressionType[]{ExpressionType.COLOR};
+            case "width":
+            case "height":
+                return new ExpressionType[]{ExpressionType.PIXEL, ExpressionType.PERCENTAGE, ExpressionType.SCALAR};
+            default:
+                return new ExpressionType[]{ExpressionType.UNDEFINED};
+        }
+    }
+
+
     // Using a separated func for readability, checks if-else bodies for any problems. (Works in separated scopes)
     private void checkIfClause(IfClause ifClause) {
-        // Check condition
-        for (ASTNode child : ifClause.getChildren()) {
-            if (!(child instanceof ElseClause) && !(child instanceof IfClause)) {
-                checkNode(child);
-            }
+        if (ifClause.conditionalExpression == null) return; // Guard
+
+        ASTNode condition = ifClause.conditionalExpression;
+        ExpressionType type = getExpressionType(condition);
+
+        if (type != ExpressionType.BOOL) {
+            ifClause.setError("Condition in if-statement must be of type BOOLEAN but got " + type + ".");
         }
 
-        // Check if body
+        // Recurse
+        // NOTE: Moved the scope-pushing into checkNode to improve code density. (See: D1)
         for (ASTNode child : ifClause.getChildren()) {
-            if (child instanceof IfClause) { // Nested If
-                checkIfClause((IfClause) child);
-            } else if (child instanceof VariableAssignment) { // Std body.
-                variableTypes.addFirst(new HashMap<String, ExpressionType>());
-                checkNode(child);
-                variableTypes.removeFirst();
-            }
-        }
-
-        // Check else body
-        for (ASTNode child : ifClause.getChildren()) {
-            if (child instanceof ElseClause) {
-                variableTypes.addFirst(new HashMap<String, ExpressionType>());
-                checkNode(child);
-                variableTypes.removeFirst();
-            }
+            checkNode(child);
         }
     }
 
     // Adds variable assignment to current scope
     private void handleVariableAssignment(VariableAssignment node) {
-        if (node.name == null || node.name.name == null) return;
+        if (node.name == null || node.name.name == null) return; // Guard
 
         String varName = node.name.name;
         HashMap<String, ExpressionType> currentScope = variableTypes.getFirst();
 
-        // Add variable to current (top) scope
-        currentScope.put(varName, ExpressionType.UNDEFINED); // FIXME: CURRENTLY USING UNDEFINED AS A PLACEHOLDER, WILL HAVE TO SET THE ACTUAL VALUE AT THIS SECTION LATER FOR OTHER IMPLEMENTAITONS (e.g, CH04, CH05
+        // Get the variable value (else undefined) and pushes to the scope.
+        if (node.expression != null) {
+            ExpressionType type = getExpressionType(node.expression);
+            currentScope.put(varName, type);
+        } else {
+            currentScope.put(varName, ExpressionType.UNDEFINED);
+        }
     }
 
     // Validates if variable that's being referenced exists / is accessible in respective scope.
@@ -122,5 +181,53 @@ public class Checker {
             }
         }
         return false;
+    }
+
+    // Practically duplication from 'isVariableDefined' but gets the actual type.
+    // TODO: Might be possible to condense both functions into one if it's actually a merit
+    private ExpressionType resolveVariableType(String name) {
+        for (int i = 0; i < variableTypes.getSize(); i++) {
+            HashMap<String, ExpressionType> scope = variableTypes.get(i);
+            if (scope.containsKey(name)) {
+                return scope.get(name);
+            }
+        }
+        return ExpressionType.UNDEFINED;
+    }
+
+
+    private ExpressionType getExpressionType(ASTNode node) {
+        if (node instanceof BoolLiteral) return ExpressionType.BOOL;
+        if (node instanceof ColorLiteral) return ExpressionType.COLOR;
+        if (node instanceof PixelLiteral) return ExpressionType.PIXEL;
+        if (node instanceof PercentageLiteral) return ExpressionType.PERCENTAGE;
+        if (node instanceof ScalarLiteral) return ExpressionType.SCALAR;
+
+        if (node instanceof VariableReference) {
+            return resolveVariableType(((VariableReference) node).name);
+        }
+
+        // NOTE: Might have to handle math here later? Will have to revisit.
+        return ExpressionType.UNDEFINED;
+    }
+
+    // Compares to the list of allowed types and the type currently set in the AST, true if allowed, false if not.
+    private boolean isTypeAllowed(ExpressionType type, ExpressionType[] allowed) {
+        for (ExpressionType allowedType : allowed) {
+            if (type == allowedType) return true;
+        }
+        return false;
+    }
+
+    // Used to indicate which allowed expression types are allowed (For error messages)
+    private String formatAllowedTypes(ExpressionType[] allowed) {
+        StringBuilder sb = new StringBuilder();
+
+        for (int i = 0; i < allowed.length; i++) {
+            sb.append(allowed[i]);
+            if (i < allowed.length - 1) sb.append(", ");
+        }
+
+        return sb.toString();
     }
 }
