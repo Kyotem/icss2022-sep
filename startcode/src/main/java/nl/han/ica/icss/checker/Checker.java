@@ -11,13 +11,14 @@ import java.util.HashMap;
 /*
 Implemented:
     - CH01
-    - CH04
+    - CH03 (Most of this is already caught by the parser, checker only really checks via variable references)
+    - CH04 (Same as with CH03, can't directly set bad values in a declaration, but can happen via variable ref, so checking for that)
     - CH05
     - CH06
+
 TODO:
-    - CH02
-    - CH03
-    - In-Depth test (Also document it)
+    - CH02 (~20-40)
+    - In-Depth test (Also document it!!!)
 
 NOTES:
  - Code is a bit messy (E.g., not ordered) -> Might have to resolve this down the line for readability.
@@ -58,6 +59,12 @@ public class Checker {
             newScopePushed = true;
         }
 
+
+        // Check math operations
+        if (node instanceof Operation) {
+            checkOperationForColors((Operation) node);
+        }
+
         // Traverse AST
         for (ASTNode child : node.getChildren()) {
 
@@ -75,11 +82,11 @@ public class Checker {
             if (child instanceof VariableAssignment) {
                 handleVariableAssignment((VariableAssignment) child);
             }
+        }
 
-            // Check properties (e.g., width, color)
-            if (child instanceof Declaration) {
-                checkDeclaration((Declaration) child);
-            }
+        // Check properties (e.g., width, color)
+        if (node instanceof Declaration) {
+            checkDeclaration((Declaration) node);
         }
 
         if (newScopePushed) { // Pop scope when leaving the scope-context
@@ -87,6 +94,22 @@ public class Checker {
         }
     }
 
+    // NOTE: Setting the error on the operation, not the child that's causing it, might need to make it so the actual child is being flagged?
+    private void checkOperationForColors(Operation op) {
+        if (op.lhs != null) {
+            ExpressionType lhsType = getExpressionType(op.lhs);
+            if (lhsType == ExpressionType.COLOR) {
+                op.setError("Cannot use type COLOR in math operations.");
+            }
+        }
+
+        if (op.rhs != null) {
+            ExpressionType rhsType = getExpressionType(op.rhs);
+            if (rhsType == ExpressionType.COLOR) {
+                op.setError("Cannot use type COLOR in math operations.");
+            }
+        }
+    }
 
     // Check for declarations (e.g., Width, Color, etc)
     // NOTE: I'm only checking variables used for declarations, the parser makes sure declarations can't have any wrong types (e.g., hexvals in dimensional declarations are not possible, unless done by variable, which is checked here)
