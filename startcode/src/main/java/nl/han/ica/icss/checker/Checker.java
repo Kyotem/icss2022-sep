@@ -12,14 +12,14 @@ import java.util.HashMap;
 /*
 Implemented:
     - CH01
+    - CH02
     - CH03 (Most of this is already caught by the parser, checker only really checks via variable references)
     - CH04 (Same as with CH03, can't directly set bad values in a declaration, but can happen via variable ref, so checking for that)
     - CH05
     - CH06
 
 TODO:
-    - CH02 (~20-40)
-    - In-Depth test (Also document it!!!)
+    - Document which functions cover which CH(x) functionality fo clarity
 
 NOTES:
  - Code is a bit messy (E.g., not ordered) -> Might have to resolve this down the line for readability.
@@ -119,6 +119,8 @@ public class Checker {
             if (actualType == ExpressionType.UNDEFINED) { // Variable not defined or type not properly set IN a 'declaration'
                 ref.setError("Variable '" + ref.name + "' is not defined or has unknown type.");
             } else if (!isTypeAllowed(actualType, expectedTypes)) { // Compare type of the variable to the declaration it's being used in.
+                // NOTE: Currently you can get an error like 'Property 'height' expects one of PIXEL, PERCENTAGE, SCALAR but got COLOR.'
+                // TODO: Properties don't just allow a singular SCALAR value, only in math, so maybe have to change the allowed types or the error.
                 decl.setError("Property '" + decl.property.name + "' expects one of " +
                         formatAllowedTypes(expectedTypes) + " but got " + actualType + ".");
             }
