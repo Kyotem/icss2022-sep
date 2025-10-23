@@ -4,6 +4,7 @@ import nl.han.ica.datastructures.HANLinkedList;
 import nl.han.ica.datastructures.IHANLinkedList;
 import nl.han.ica.icss.ast.*;
 import nl.han.ica.icss.ast.literals.*;
+import nl.han.ica.icss.ast.operations.*;
 import nl.han.ica.icss.ast.types.ExpressionType;
 
 import java.util.HashMap;
@@ -62,7 +63,14 @@ public class Checker {
 
         // Check math operations
         if (node instanceof Operation) {
-            checkOperationForColors((Operation) node);
+            /*
+             NOTE:
+             We aren't using the 'get' of this function in this context.
+             The code that checks for whether or not math is valid per the rules calls the 'getExpressionType();' function recursively.
+             So that function DOES need the values returned from it's recursive calls.
+             Feels a bit off to call a get function and not doing anything with the value, probably not good convention-wise, but it works... for now.
+             */
+            getExpressionType(node);
         }
 
         // Traverse AST
@@ -94,22 +102,6 @@ public class Checker {
         }
     }
 
-    // NOTE: Setting the error on the operation, not the child that's causing it, might need to make it so the actual child is being flagged?
-    private void checkOperationForColors(Operation op) {
-        if (op.lhs != null) {
-            ExpressionType lhsType = getExpressionType(op.lhs);
-            if (lhsType == ExpressionType.COLOR) {
-                op.setError("Cannot use type COLOR in math operations.");
-            }
-        }
-
-        if (op.rhs != null) {
-            ExpressionType rhsType = getExpressionType(op.rhs);
-            if (rhsType == ExpressionType.COLOR) {
-                op.setError("Cannot use type COLOR in math operations.");
-            }
-        }
-    }
 
     // Check for declarations (e.g., Width, Color, etc)
     // NOTE: I'm only checking variables used for declarations, the parser makes sure declarations can't have any wrong types (e.g., hexvals in dimensional declarations are not possible, unless done by variable, which is checked here)
@@ -240,6 +232,7 @@ public class Checker {
     }
 
 
+    // TODO: Function has grown a bit large, cognitive complexity a tad high, might need to refactor for readability. (Separate math concerns perhaps?)
     private ExpressionType getExpressionType(ASTNode node) {
         if (node instanceof BoolLiteral) return ExpressionType.BOOL;
         if (node instanceof ColorLiteral) return ExpressionType.COLOR;
@@ -251,9 +244,54 @@ public class Checker {
             return resolveVariableType(((VariableReference) node).name);
         }
 
-        // NOTE: Might have to handle math here later? Will have to revisit.
+        // NOTE: Errors are set on the Operation node, not the actual node that is causing the issue. (e.g., VarRef in the operation)
+        if (node instanceof Operation) {
+
+            Operation op = (Operation) node;
+            // Recurse
+            ExpressionType lhsType = getExpressionType(op.lhs);
+            ExpressionType rhsType = getExpressionType(op.rhs);
+            // ---
+
+            if (lhsType == ExpressionType.UNDEFINED || rhsType == ExpressionType.UNDEFINED) {
+                return ExpressionType.UNDEFINED;
+            }
+
+            // Prevent colors from being used in any math operation
+            if (lhsType == ExpressionType.COLOR || rhsType == ExpressionType.COLOR) {
+                op.setError("Cannot use COLOR in math operations.");
+                return ExpressionType.UNDEFINED;
+            }
+
+            // Check if types match exactly between + and - operands
+            if (op instanceof AddOperation || op instanceof SubtractOperation) {
+                if (lhsType != rhsType) {
+                    // Dynamically indicate at what operator it's happening. (Discern between + and -, not exact ref)
+                    op.setError("Operands of '" + (op instanceof AddOperation ? "+" : "-") + "' must have the same type, got "
+                            + lhsType + " and " + rhsType + ".");
+                    return ExpressionType.UNDEFINED;
+                }
+                return lhsType;
+            }
+
+            // Check if Multiplication operations include at least ONE SCALAR type.
+            if (op instanceof MultiplyOperation) {
+                boolean lhsIsScalar = lhsType == ExpressionType.SCALAR;
+                boolean rhsIsScalar = rhsType == ExpressionType.SCALAR;
+
+                if (lhsIsScalar && rhsIsScalar) return ExpressionType.SCALAR;
+                if (lhsIsScalar) return rhsType;
+                if (rhsIsScalar) return lhsType;
+
+                // Reject if no scalar value is found.
+                op.setError("Multiplication requires at least one scalar operand, got " + lhsType + " * " + rhsType);
+                return ExpressionType.UNDEFINED;
+            }
+        }
+
         return ExpressionType.UNDEFINED;
     }
+
 
     // Compares to the list of allowed types and the type currently set in the AST, true if allowed, false if not.
     private boolean isTypeAllowed(ExpressionType type, ExpressionType[] allowed) {
