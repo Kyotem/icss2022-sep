@@ -13,16 +13,16 @@ Implemented:
     - CH01
     - CH04
     - CH05
-    - CH06 ~ (Partial, still broken on if-clauses)
+    - CH06
 TODO:
     - CH02
     - CH03
-    - CH06 (Fix if-clauses)
     - In-Depth test (Also document it)
 
 NOTES:
  - Code is a bit messy (E.g., not ordered) -> Might have to resolve this down the line for readability.
  - Might be good to document standard flow as well, doubt i'll remember this if I pause for a few days.
+ - Maybe make own hashmap to implement?
 
  */
 
@@ -46,14 +46,14 @@ public class Checker {
 
         if (node == null) return; // Guard
 
-        if (node instanceof IfClause) { // FIXME: Scoping for if-clauses is a bit broken right now, will have to fix down the line.
+        if (node instanceof IfClause) {
             checkIfClause((IfClause) node);
             return;
         }
 
         boolean newScopePushed = false;
 
-        if (node instanceof Stylerule || node instanceof ElseClause) { // Push new scope (D1)
+        if (node instanceof Stylerule || node instanceof ElseClause) { // Push new scope (Extra scope-push for else-clause here to accommodate for style-rule variables
             variableTypes.addFirst(new HashMap<String, ExpressionType>());
             newScopePushed = true;
         }
@@ -133,6 +133,7 @@ public class Checker {
     private void checkIfClause(IfClause ifClause) {
         if (ifClause.conditionalExpression == null) return; // Guard
 
+        // Check condition type
         ASTNode condition = ifClause.conditionalExpression;
         ExpressionType type = getExpressionType(condition);
 
@@ -140,12 +141,32 @@ public class Checker {
             ifClause.setError("Condition in if-statement must be of type BOOLEAN but got " + type + ".");
         }
 
-        // Recurse
-        // NOTE: Moved the scope-pushing into checkNode to improve code density. (See: D1)
+        variableTypes.addFirst(new HashMap<>()); // Push new if scope
+        // Check if-body (Separate scope)
         for (ASTNode child : ifClause.getChildren()) {
-            checkNode(child);
+            if (!(child instanceof ElseClause)) { // Skip else statements
+                if (child instanceof VariableAssignment) {
+                    handleVariableAssignment((VariableAssignment) child);
+                }
+                checkNode(child);
+            }
+        }
+        variableTypes.removeFirst(); // Pop if scope
+
+
+        // Check else-body (Separate scope)
+        if (ifClause.elseClause != null) {
+            variableTypes.addFirst(new HashMap<>()); // Push else scope
+            for (ASTNode child : ifClause.elseClause.getChildren()) {
+                if (child instanceof VariableAssignment) {
+                    handleVariableAssignment((VariableAssignment) child);
+                }
+                checkNode(child);
+            }
+            variableTypes.removeFirst(); // Pop else scope
         }
     }
+
 
     // Adds variable assignment to current scope
     private void handleVariableAssignment(VariableAssignment node) {
