@@ -1,43 +1,64 @@
 package nl.han.ica.icss.transforms;
 
-import nl.han.ica.datastructures.HANLinkedList;
-import nl.han.ica.datastructures.IHANLinkedList;
 import nl.han.ica.icss.ast.*;
 import nl.han.ica.icss.ast.literals.*;
 import nl.han.ica.icss.ast.operations.*;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 
+/*
+    TODO:
+        - In-Depth Test
+        - Improve general flow (Feels like a lot of looping in a way that is really inefficient, so have to revisit it)
+
+ */
+
 public class Evaluator implements Transform {
 
-    private IHANLinkedList<HashMap<String, Literal>> variableValues;
+    // NOTE: Scoping is not relevant in this step anymore as the Parser & Checker have made sure that there aren't any inconsistencies
+    private final HashMap<String, Literal> variableValues = new HashMap<>();
 
     @Override
     public void apply(AST ast) {
-        variableValues = new HANLinkedList<HashMap<String, Literal>>();
-
-        // Top-level scope (Global definition of vars)
-        variableValues.addFirst(new HashMap<String, Literal>());
-
         if (ast.root != null) {
-            evaluateNode(ast.root);
+            evaluateNode(ast.root, null);
         }
     }
 
-    private void evaluateNode(ASTNode node) {
-        if (node == null) return; // Guard
+    private void evaluateNode(ASTNode node, ASTNode parent) {
+        if (node == null) return;
 
-        boolean newScopePushed = false;
+        // Handle IfClause replacement first
+        if (node instanceof IfClause) {
+            IfClause ifNode = (IfClause) node;
+            BoolLiteral condition = (BoolLiteral) evaluateExpression(ifNode.getConditionalExpression());
 
-// TODO
-//        if (node instanceof IfClause) {
-//        }
+            // Temporarily store the nodes from the body to keep in here.
+            ArrayList<ASTNode> replacementNodes = new ArrayList<>();
 
-        if (node instanceof Stylerule || node instanceof ElseClause) { // Push new scope (Extra scope-push for else-clause here to accommodate for style-rule variables
-            variableValues.addFirst(new HashMap<String, Literal>());
-            newScopePushed = true;
-        } else if (node instanceof Declaration) {
+            if (condition.value) { // TRUE, so keep the body from the IfClause
+                replacementNodes.addAll(ifNode.body);
+            } else if (ifNode.getElseClause() != null) { // FALSE && ElseClause exists, so keep body of ElseClause
+                replacementNodes.addAll(ifNode.getElseClause().body);
+            }
+            // FALSE && ElseClause does NOT exist, so we don't store any bodies.
+
+                // Remove IfClause
+                parent.removeChild(ifNode);
+
+                // Add remaining body's children to the parent of the IfClause, and check these bodies as well (in-case for nested if-else clauses)
+                for (ASTNode child : replacementNodes) {
+                    parent.addChild(child);
+                    evaluateNode(child, parent); // recursively handle nested IfClauses
+                }
+                 return;
+            }
+
+
+        // Evaluate declarations
+        if (node instanceof Declaration) {
             Declaration decl = (Declaration) node;
             decl.expression = evaluateExpression(decl.expression);
         }
@@ -47,26 +68,20 @@ public class Evaluator implements Transform {
         while (it.hasNext()) {
             ASTNode child = it.next();
 
-            // Handle variable assignments before recursion
+            // Handle variable assignments and recurse
             if (child instanceof VariableAssignment) {
                 VariableAssignment varAssign = (VariableAssignment) child;
                 Literal value = evaluateExpression(varAssign.expression);
-                variableValues.getFirst().put(varAssign.name.name, value);
+                variableValues.put(varAssign.name.name, value);
 
                 // Remove the variable assignment node from the AST
                 it.remove();
                 continue;
             }
-
             // Recurse
-            evaluateNode(child);
-        }
-
-        if (newScopePushed) {
-            variableValues.removeFirst();
+            evaluateNode(child, node);
         }
     }
-
 
     private Literal evaluateExpression(Expression expr) {
         if (expr == null) return null; // Guard
@@ -79,13 +94,7 @@ public class Evaluator implements Transform {
         // Resolve variable
         if (expr instanceof VariableReference) {
             VariableReference ref = (VariableReference) expr;
-            Literal resolved = resolveVariableValue(ref.name);
-
-            if (resolved != null) {
-                // Cloning to prevent shared refs
-                return cloneLiteral(resolved);
-            }
-            return null;
+            return cloneLiteral(variableValues.get(ref.name));
         }
 
         // Eval operations
@@ -135,7 +144,7 @@ public class Evaluator implements Transform {
         return null;
     }
 
-    // NOTE: Can use bit-shifting for faster math.
+    // NOTE: Can use bit-shifting for faster math?
     private Literal handleMultiply(Literal lhs, Literal rhs) {
 
         if (lhs instanceof ScalarLiteral && rhs instanceof ScalarLiteral)
@@ -152,16 +161,6 @@ public class Evaluator implements Transform {
             return new PercentageLiteral(((PercentageLiteral) lhs).value * ((ScalarLiteral) rhs).value);
 
         return null;
-    }
-
-    private Literal resolveVariableValue(String name) {
-        for (int i = 0; i < variableValues.getSize(); i++) {
-            HashMap<String, Literal> scope = variableValues.get(i);
-            if (scope.containsKey(name)) {
-                return scope.get(name);
-            }
-        }
-        return null; // This should not happen... but, we'll see
     }
 
     private Literal cloneLiteral(Literal lit) {

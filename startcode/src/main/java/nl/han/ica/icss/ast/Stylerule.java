@@ -39,6 +39,18 @@ public class Stylerule extends ASTNode {
 
 		return this;
     }
+
+	// Implemented for TR02
+	@Override
+	public ASTNode removeChild(ASTNode child) {
+		if (child instanceof Selector) {
+			selectors.remove(child);
+		} else {
+			body.remove(child);
+		}
+		return this;
+	}
+
 	@Override
 	public boolean equals(Object o) {
 		if (this == o) return true;

@@ -50,6 +50,21 @@ public class IfClause extends ASTNode {
 
         return this;
     }
+
+    // Implemented for TR02
+    @Override
+    public ASTNode removeChild(ASTNode child) {
+        if (child instanceof Expression) {
+            conditionalExpression = null;
+        } else if (child instanceof ElseClause) {
+            elseClause = null;
+        } else {
+            body.remove(child);
+        }
+        return this;
+    }
+
+
     @Override
     public boolean equals(Object o) {
         if (this == o) return true;
