@@ -2,17 +2,17 @@ package nl.han.ica.datastructures;
 
 import java.util.ArrayList;
 
-public class HANStack implements IHANStack {
+public class HANStack<T> implements IHANStack<T> {
 
-    private ArrayList<Object> stack = new ArrayList<>();
+    private ArrayList<T> stack = new ArrayList<>();
 
     @Override
-    public void push(Object value) {
+    public void push(T value) {
         stack.add(value);
     }
 
     @Override
-    public Object pop() {
+    public T pop() {
         if (stack.isEmpty())
             return null;
 
@@ -20,7 +20,7 @@ public class HANStack implements IHANStack {
     }
 
     @Override
-    public Object peek() {
+    public T peek() {
         if (stack.isEmpty())
             return null;
 
