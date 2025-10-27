@@ -1,13 +1,14 @@
 grammar ICSS;
 
 //--- LEXER: ---
-// TODO: variabledef and propertyexpr take way too long to evaluate for level3.icss for example. (0.5 and 0.3 respectively) Might need to improve on this later.
+// NOTE: variabledef and propertyexpr take way too long to evaluate for level3.icss for example. (0.5 and 0.3 respectively)
+// Would be good to rewrite grammar for performance. But I wont.
 
-
-// IF
+// If-Else
 IF: 'if';
 ELSE: 'else';
 
+// Properties
 COLOR_PROPERTY : 'color' | 'background-color';
 DIM_PROPERTY : 'width' | 'height' ;
 
@@ -17,25 +18,17 @@ PIXELSIZE: [0-9]+ 'px';
 PERCENTAGE: [0-9]+ '%';
 SCALAR: [0-9]+;
 
-
 // Color value takes precedence over id idents
 fragment HEXDIGIT : [0-9a-fA-F] ;
 HEXVAL : '#' HEXDIGIT HEXDIGIT HEXDIGIT HEXDIGIT HEXDIGIT HEXDIGIT ;
 
-// Specific identifiers for id's and css classes
-// Why are these separated? Is there a reason to tokenize these separately? (Syntaxically it shouldn't matter, Only semantically, so why not [a-z0-9#.\-)
-//ID_IDENT: '#' [a-z0-9\-]+;
-//CLASS_IDENT: '.' [a-z0-9\-]+;
-
 // General identifiers
-// Can this be improved or are we just stuck like this?
-// Currently using for : selectors
+// Currently using for: selectors (Specifics like class or Id will be handled in the ASTListener)
 LOWER_IDENT: ([a-z] | '#' | '.' ) [a-z0-9\-]*;
-// Currently using for : variable names
+// Currently using for: variable names
 CAPITAL_IDENT: [A-Z] [A-Za-z0-9_]*;
 
-// If whitespace is tokenized -> skips it (So the parser doesn't have to do anything with it)
-// Or is it just not tokenized at all? (Seems like it)
+// Handle Whitespace
 WS: [ \t\r\n]+ -> skip;
 
 // Generic Syntaxis
@@ -47,7 +40,7 @@ SEMICOLON: ';';
 COLON: ':';
 ASSIGNMENT_OPERATOR: ':=';
 
-// Math operations
+// Math operators
 PLUS: '+';
 MIN: '-';
 MUL: '*';
@@ -70,7 +63,7 @@ expr
     : factor | expr MUL expr | expr (PLUS | MIN) expr
     ;
 
-// Really REALLY duplicated, will hav e to refactor big time and make it tidy and neat
+// NOTE: Feels a bit redundant to create factor, potentially duplicated code. Won't adjust but I can see that this grammar can be improved.
 factor
     : SCALAR
     | PERCENTAGE
@@ -91,7 +84,7 @@ colorValue
     ;
 
 /*
- Selector (CSS) block (Takes any lowercase set of characters,
+ Selector (CSS) block (Takes any lowercase set of characters and allows, only a lowercase character, '#' and '.' to be used for the first character in the set)
  checking for '#' and '.' is done in the conversion from parser tree to AST
  */
 selectorstmt
@@ -103,7 +96,6 @@ propertyexpr
     : COLOR_PROPERTY COLON colorValue SEMICOLON
     | DIM_PROPERTY   COLON (factor | mathExpr) SEMICOLON
     ;
-
 
 // if-else statements (Allow property expressions, variable definitions and nested if-statements)
 ifstmt

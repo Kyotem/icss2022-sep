@@ -1,9 +1,12 @@
 package nl.han.ica.datastructures;
 
-public class HANLinkedList<T> implements IHANLinkedList {
+public class HANLinkedList<T> implements IHANLinkedList<T> {
 
     private LinkedListNode<T> head;
     private int size;
+    // java:S1192 SonarLinter
+
+    private static final String OUT_OF_BOUNDS_MESSAGE = "Index out of bounds";
 
     public HANLinkedList() {
         head = null;
@@ -11,10 +14,8 @@ public class HANLinkedList<T> implements IHANLinkedList {
     }
 
     @Override
-    public void addFirst(Object value) {
-        // TODO: Casting, though maybe change the interface to allow for T specifically?
-        T val = (T) value;
-        LinkedListNode<T> newNode = new LinkedListNode<>(val);
+    public void addFirst(T value) {
+        LinkedListNode<T> newNode = new LinkedListNode<>(value);
         newNode.next = head;
         head = newNode;
         size++;
@@ -28,13 +29,13 @@ public class HANLinkedList<T> implements IHANLinkedList {
     }
 
     @Override
-    public void insert(int index, Object value) { // Maybe add a check to make sure index is within range?
-
-        // TODO: Casting, though maybe change the interface to allow for T specifically?
-        T val = (T) value;
+    public void insert(int index, T value) {
+        if (index < 0 || index > size) {
+            throw new IndexOutOfBoundsException(OUT_OF_BOUNDS_MESSAGE); // NOTE: Not going to handle the exceptions, but just doing this for code quality reasons.
+        }
 
         if (index == 0) {
-            addFirst(val);
+            addFirst(value);
             return;
         }
 
@@ -43,7 +44,7 @@ public class HANLinkedList<T> implements IHANLinkedList {
             prev = prev.next;
         }
 
-        LinkedListNode<T> newNode = new LinkedListNode<>(val);
+        LinkedListNode<T> newNode = new LinkedListNode<>(value);
         newNode.next = prev.next;
         prev.next = newNode;
 
@@ -51,7 +52,10 @@ public class HANLinkedList<T> implements IHANLinkedList {
     }
 
     @Override
-    public void delete(int index) { // Maybe add a check to make sure index is within range?
+    public void delete(int index) {
+        if (index < 0 || index >= size) {
+            throw new IndexOutOfBoundsException(OUT_OF_BOUNDS_MESSAGE); // NOTE: Not going to handle the exceptions, but just doing this for code quality reasons.
+        }
 
         if (index == 0) {
             removeFirst();
@@ -69,10 +73,12 @@ public class HANLinkedList<T> implements IHANLinkedList {
 
 
     @Override
-    public Object get(int index) {  // Maybe add a check to make sure index is within range?
+    public T get(int index) {
+        if (index < 0 || index >= size) {
+            throw new IndexOutOfBoundsException(OUT_OF_BOUNDS_MESSAGE); // NOTE: Not going to handle the exceptions, but just doing this for code quality reasons.
+        }
 
         LinkedListNode<T> current = head;
-
         for (int i = 0; i < index; i++) {
             current = current.next;
         }
@@ -81,14 +87,17 @@ public class HANLinkedList<T> implements IHANLinkedList {
     }
 
     @Override
-    public void removeFirst() { // FIXME: How to handle if list is empty? Can't access head if it doesn't exist!
+    public void removeFirst() {
+        if (head == null) {
+            throw new IllegalStateException("List is empty"); // NOTE: Again not handling this somewhere.
+        }
 
         head = head.next;
         size--;
     }
 
     @Override
-    public Object getFirst() {
+    public T getFirst() {
 
         if (head == null) {
             return null;
@@ -99,7 +108,6 @@ public class HANLinkedList<T> implements IHANLinkedList {
 
     @Override
     public int getSize() {
-
         return size;
     }
 }

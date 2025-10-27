@@ -4,7 +4,7 @@ import java.util.ArrayList;
 
 public class HANStack<T> implements IHANStack<T> {
 
-    private ArrayList<T> stack = new ArrayList<>();
+    private final ArrayList<T> stack = new ArrayList<>();
 
     @Override
     public void push(T value) {
