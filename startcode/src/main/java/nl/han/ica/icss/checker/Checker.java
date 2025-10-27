@@ -231,7 +231,7 @@ public class Checker {
 
     // Resolves any node to it's ExpressionType (Literals, Variables, Math, etc.)
     private ExpressionType getExpressionType(ASTNode node) {
-        
+
         // Directly return the expression type if it's a Literal.
         if (node instanceof BoolLiteral) return ExpressionType.BOOL;
         if (node instanceof ColorLiteral) return ExpressionType.COLOR;

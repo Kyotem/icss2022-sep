@@ -9,9 +9,10 @@ import java.util.HashMap;
 import java.util.Iterator;
 
 /*
-    TODO:
-        - In-Depth Test
-        - Improve general flow (Feels like a lot of looping in a way that is really inefficient, so have to revisit it)
+
+    NOTE:
+    Tried to use the same flow as with the Checker, but deviated a bit from it. Current flow seems inefficient and isn't all to great in my opinion.
+    Would ideally refactor the way it loops over everything; but it works, so it's fine for now.
 
  */
 
@@ -28,12 +29,17 @@ public class Evaluator implements Transform {
     }
 
     private void evaluateNode(ASTNode node, ASTNode parent) {
-        if (node == null) return;
+        if (node == null) return; // Guard
 
         // Handle IfClause replacement first
         if (node instanceof IfClause) {
+
             IfClause ifNode = (IfClause) node;
             BoolLiteral condition = (BoolLiteral) evaluateExpression(ifNode.getConditionalExpression());
+
+            if (condition == null) { // Should not happen, but doing this as condition.value below could throw a NullPointerException, so doing this for clarity.
+                throw new IllegalStateException("The Conditional of a IfClause is NULL whilst it should not be possible (In the Evaluator)");
+            }
 
             // Temporarily store the nodes from the body to keep in here.
             ArrayList<ASTNode> replacementNodes = new ArrayList<>();
@@ -51,7 +57,7 @@ public class Evaluator implements Transform {
                 // Add remaining body's children to the parent of the IfClause, and check these bodies as well (in-case for nested if-else clauses)
                 for (ASTNode child : replacementNodes) {
                     parent.addChild(child);
-                    evaluateNode(child, parent); // recursively handle nested IfClauses
+                    evaluateNode(child, parent); // Recursively handle nested IfClauses
                 }
                  return;
             }
@@ -114,11 +120,11 @@ public class Evaluator implements Transform {
     private Literal evaluateOperation(Operation op, Literal lhs, Literal rhs) {
         if (lhs == null || rhs == null) return null; // Guard
 
-        if (op instanceof AddOperation)
+        if (op instanceof AddOperation) // + (ADD)
             return handleAdd(lhs, rhs);
-        if (op instanceof SubtractOperation)
+        if (op instanceof SubtractOperation) // - (MIN)
             return handleSubtract(lhs, rhs);
-        if (op instanceof MultiplyOperation)
+        if (op instanceof MultiplyOperation) // * (MUL)
             return handleMultiply(lhs, rhs);
 
         return null;

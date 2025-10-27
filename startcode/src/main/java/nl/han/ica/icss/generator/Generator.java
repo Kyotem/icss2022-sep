@@ -23,12 +23,12 @@ public class Generator {
 
 			Stylerule rule = (Stylerule) node;
 
-
+			// Handle Selectors
 			for (Selector selector : rule.selectors) {
 				sb.append(indent).append(selector.toString()).append(" {\n");
 			}
 
-			// Handle declarations
+			// Handle Declarations (e.g., width:, color:)
 			for (ASTNode child : rule.body) {
 				if (child instanceof Declaration) {
 					generateDeclaration((Declaration) child, sb, indentLevel + 1);
@@ -84,6 +84,6 @@ public class Generator {
 		if (literal instanceof BoolLiteral) {
 			return String.valueOf(((BoolLiteral) literal).value);
 		}
-		return ""; // Shouldn't happen... hopefully
+		return "ERROR (NO LITERAL FOUND)"; // Shouldn't happen... hopefully
 	}
 }
