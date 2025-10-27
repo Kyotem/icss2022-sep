@@ -18,12 +18,9 @@ Implemented:
     - CH05
     - CH06
 
-TODO:
-    - Document which functions cover which CH(x) functionality fo clarity
-
 NOTES:
  - Code is a bit messy (E.g., not ordered) -> Might have to resolve this down the line for readability.
- - Might be good to document standard flow as well, doubt i'll remember this if I pause for a few days.
+ - Might be good to document standard flow as well, doubt I'll remember this if I pause for a few days.
  - Maybe make own hashmap to implement?
 
  */
@@ -36,7 +33,7 @@ public class Checker {
         variableTypes = new HANLinkedList<>();
 
         // Top-level scope (Global definition of vars)
-        variableTypes.addFirst(new HashMap<String, ExpressionType>());
+        variableTypes.addFirst(new HashMap<>());
 
         // ! Entrypoint !
         if (ast.root != null) {
@@ -48,6 +45,7 @@ public class Checker {
 
         if (node == null) return; // Guard
 
+        // Handle IfClauses
         if (node instanceof IfClause) {
             checkIfClause((IfClause) node);
             return;
@@ -56,7 +54,7 @@ public class Checker {
         boolean newScopePushed = false;
 
         if (node instanceof Stylerule || node instanceof ElseClause) { // Push new scope (Extra scope-push for else-clause here to accommodate for style-rule variables
-            variableTypes.addFirst(new HashMap<String, ExpressionType>());
+            variableTypes.addFirst(new HashMap<>());
             newScopePushed = true;
         }
 
@@ -66,8 +64,8 @@ public class Checker {
             /*
              NOTE:
              We aren't using the 'get' of this function in this context.
-             The code that checks for whether or not math is valid per the rules calls the 'getExpressionType();' function recursively.
-             So that function DOES need the values returned from it's recursive calls.
+             The code that checks for whether math is valid per the rules calls the 'getExpressionType();' function recursively.
+             So that function DOES need the values returned from its recursive calls.
              Feels a bit off to call a get function and not doing anything with the value, probably not good convention-wise, but it works... for now.
              */
             getExpressionType(node);
@@ -76,7 +74,7 @@ public class Checker {
         // Traverse AST
         for (ASTNode child : node.getChildren()) {
 
-            // Skip variablereferences that are nested inside of variableassignments. (Still don't know why var reference has to be defined in an assignment? OH well.
+            // Skip variable references that are nested inside variable assignments. (Still don't know why var reference has to be defined in an assignment? Oh, well!)
             if (child instanceof VariableReference
                     && !(node instanceof VariableAssignment && node.getChildren().get(0) == child)) {
                 handleVariableReference((VariableReference) child);
@@ -102,7 +100,6 @@ public class Checker {
         }
     }
 
-
     // Check for declarations (e.g., Width, Color, etc)
     // NOTE: I'm only checking variables used for declarations, the parser makes sure declarations can't have any wrong types (e.g., hexvals in dimensional declarations are not possible, unless done by variable, which is checked here)
     private void checkDeclaration(Declaration decl) {
@@ -119,8 +116,8 @@ public class Checker {
             if (actualType == ExpressionType.UNDEFINED) { // Variable not defined or type not properly set IN a 'declaration'
                 ref.setError("Variable '" + ref.name + "' is not defined or has unknown type.");
             } else if (!isTypeAllowed(actualType, expectedTypes)) { // Compare type of the variable to the declaration it's being used in.
-                // NOTE: Currently you can get an error like 'Property 'height' expects one of PIXEL, PERCENTAGE, SCALAR but got COLOR.'
-                // TODO: Properties don't just allow a singular SCALAR value, only in math, so maybe have to change the allowed types or the error.
+                /* NOTE: Currently you can get an error like 'Property 'height' expects one of PIXEL, PERCENTAGE, SCALAR but got COLOR.'
+                  Properties don't just allow a singular SCALAR value, only in math, so maybe have to change the allowed types or the error. */
                 decl.setError("Property '" + decl.property.name + "' expects one of " +
                         formatAllowedTypes(expectedTypes) + " but got " + actualType + ".");
             }
@@ -221,8 +218,7 @@ public class Checker {
         return false;
     }
 
-    // Practically duplication from 'isVariableDefined' but gets the actual type.
-    // TODO: Might be possible to condense both functions into one if it's actually a merit
+    // Practically duplication from 'isVariableDefined' but gets the actual type. Could probably condense into one function. (Won't do it, but I can see the merit in doing so)
     private ExpressionType resolveVariableType(String name) {
         for (int i = 0; i < variableTypes.getSize(); i++) {
             HashMap<String, ExpressionType> scope = variableTypes.get(i);
@@ -233,67 +229,85 @@ public class Checker {
         return ExpressionType.UNDEFINED;
     }
 
-
-    // TODO: Function has grown a bit large, cognitive complexity a tad high, might need to refactor for readability. (Separate math concerns perhaps?)
+    // Resolves any node to it's ExpressionType (Literals, Variables, Math, etc.)
     private ExpressionType getExpressionType(ASTNode node) {
+        
+        // Directly return the expression type if it's a Literal.
         if (node instanceof BoolLiteral) return ExpressionType.BOOL;
         if (node instanceof ColorLiteral) return ExpressionType.COLOR;
         if (node instanceof PixelLiteral) return ExpressionType.PIXEL;
         if (node instanceof PercentageLiteral) return ExpressionType.PERCENTAGE;
         if (node instanceof ScalarLiteral) return ExpressionType.SCALAR;
 
+        // Resolve Variable References
         if (node instanceof VariableReference) {
             return resolveVariableType(((VariableReference) node).name);
         }
 
         // NOTE: Errors are set on the Operation node, not the actual node that is causing the issue. (e.g., VarRef in the operation)
         if (node instanceof Operation) {
-
-            Operation op = (Operation) node;
-            // Recurse
-            ExpressionType lhsType = getExpressionType(op.lhs);
-            ExpressionType rhsType = getExpressionType(op.rhs);
-            // ---
-
-            if (lhsType == ExpressionType.UNDEFINED || rhsType == ExpressionType.UNDEFINED) {
-                return ExpressionType.UNDEFINED;
-            }
-
-            // Prevent colors from being used in any math operation
-            if (lhsType == ExpressionType.COLOR || rhsType == ExpressionType.COLOR) {
-                op.setError("Cannot use COLOR in math operations.");
-                return ExpressionType.UNDEFINED;
-            }
-
-            // Check if types match exactly between + and - operands
-            if (op instanceof AddOperation || op instanceof SubtractOperation) {
-                if (lhsType != rhsType) {
-                    // Dynamically indicate at what operator it's happening. (Discern between + and -, not exact ref)
-                    op.setError("Operands of '" + (op instanceof AddOperation ? "+" : "-") + "' must have the same type, got "
-                            + lhsType + " and " + rhsType + ".");
-                    return ExpressionType.UNDEFINED;
-                }
-                return lhsType;
-            }
-
-            // Check if Multiplication operations include at least ONE SCALAR type.
-            if (op instanceof MultiplyOperation) {
-                boolean lhsIsScalar = lhsType == ExpressionType.SCALAR;
-                boolean rhsIsScalar = rhsType == ExpressionType.SCALAR;
-
-                if (lhsIsScalar && rhsIsScalar) return ExpressionType.SCALAR;
-                if (lhsIsScalar) return rhsType;
-                if (rhsIsScalar) return lhsType;
-
-                // Reject if no scalar value is found.
-                op.setError("Multiplication requires at least one scalar operand, got " + lhsType + " * " + rhsType);
-                return ExpressionType.UNDEFINED;
-            }
+            return handleOperation((Operation) node);
         }
 
         return ExpressionType.UNDEFINED;
     }
 
+    private ExpressionType handleOperation(Operation op) {
+
+        // Recurse
+        ExpressionType lhsType = getExpressionType(op.lhs);
+        ExpressionType rhsType = getExpressionType(op.rhs);
+        // ---
+
+        // Reject if either side is undefined.
+        if (lhsType == ExpressionType.UNDEFINED || rhsType == ExpressionType.UNDEFINED) {
+            return ExpressionType.UNDEFINED;
+        }
+
+        // Prevent colors from being used in any math operation
+        if (lhsType == ExpressionType.COLOR || rhsType == ExpressionType.COLOR) {
+            op.setError("Cannot use COLOR in math operations.");
+            return ExpressionType.UNDEFINED;
+        }
+
+        // Check if types match exactly between + and - operands
+        if (op instanceof AddOperation || op instanceof SubtractOperation) {
+            return handleAddSubtractOperation(op, lhsType, rhsType);
+        }
+
+        // Check if Multiplication operations include at least ONE SCALAR type. (Also accepts 2 SCALAR types)
+        if (op instanceof MultiplyOperation) {
+            return handleMultiplyOperation(op, lhsType, rhsType);
+        }
+
+        return ExpressionType.UNDEFINED; // Default
+    }
+
+    private ExpressionType handleAddSubtractOperation(Operation op, ExpressionType lhsType, ExpressionType rhsType) {
+        if (lhsType != rhsType) {
+            // Dynamically indicate at what operator it's happening. (Discern between + and -, not exact ref)
+            op.setError("Operands of '" + (op instanceof AddOperation ? "+" : "-") + "' must have the same type, got "
+                    + lhsType + " and " + rhsType + ".");
+            return ExpressionType.UNDEFINED;
+        }
+        return lhsType;
+    }
+
+    private ExpressionType handleMultiplyOperation(Operation op, ExpressionType lhsType, ExpressionType rhsType) {
+
+        // Check if one side contains a scalar
+        boolean lhsIsScalar = lhsType == ExpressionType.SCALAR;
+        boolean rhsIsScalar = rhsType == ExpressionType.SCALAR;
+
+        if (lhsIsScalar && rhsIsScalar) return ExpressionType.SCALAR; // Allow both sides as scalar. (Cannot be used in a declaration, unless another non-scalar value is used)
+        // Allow if one side is scalar
+        if (lhsIsScalar) return rhsType;
+        if (rhsIsScalar) return lhsType;
+
+        // Reject if no scalar value is found.
+        op.setError("Multiplication requires at least one scalar operand, got " + lhsType + " * " + rhsType);
+        return ExpressionType.UNDEFINED;
+    }
 
     // Compares to the list of allowed types and the type currently set in the AST, true if allowed, false if not.
     private boolean isTypeAllowed(ExpressionType type, ExpressionType[] allowed) {
